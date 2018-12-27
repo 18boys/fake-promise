@@ -6,7 +6,7 @@ class FakePromise {
   constructor(initFunc) {
     this.status = "pendding";
     this.resolve = this.resolve.bind(this);// 为什么这个地方拿不到this
-    this.reject = this.reject.bind(this);// 为什么这个地方拿不到this
+    this.reject = this.reject.bind(this);// 为什么这个地方拿不到this 是因为在initFunc中执行的原因?
     initFunc(this.resolve, this.reject);
   }
 
