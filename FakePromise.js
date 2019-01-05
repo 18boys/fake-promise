@@ -27,8 +27,6 @@ class FakePromise {
 
   resolve(value) {
     if (this.status !== 'pendding') return;
-    this.status = "fufilled";
-
     const isPromiseObject = value && value.then;
     if (!isPromiseObject) {
       this.value = value;
@@ -37,8 +35,11 @@ class FakePromise {
       // 如果是类promise对象
       try {
         value.then(function (v) {
+          this.status = "fufilled";
           this.value = v;
           this.noticeChange();
+        }.bind(this),function(reason){
+          this.reject(reason)
         }.bind(this))
       } catch(e) {
         this.reject(e)
@@ -62,7 +63,6 @@ class FakePromise {
     if (this.status === 'pending') return;
     while(this.funcCacheList.length) {
       const needProcessed = this.funcCacheList.splice(0, 1)[0];
-
       const { onResolve, onRej, resolve, reject } = needProcessed;
       if (this.status === 'fufilled') {
         try {
@@ -120,7 +120,9 @@ const myPromise = new FakePromise((res) => {
 const mPromise = new FakePromise((res, rej) => {
   res(myPromise);
 }).then((v) => {
-  console.log('执行我自己的then方法', v, myPromise)
+  console.log('执行我自己的then方法', v)
+},()=>{
+  console.log('执行catch方法1')
 }).catch(() => {
   console.log('执行catch方法')
 });
