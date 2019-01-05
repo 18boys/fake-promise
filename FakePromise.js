@@ -6,12 +6,18 @@ class FakePromise {
   constructor(initFunc) {
     this.status = "pendding";
     this.value = '';
-    this.funcCacheList = []; // 不能缓存很多 只需要缓存自己的就行 以及下一个promise的句柄
-    this.resolve = this.resolve.bind(this);// 为什么这个地方拿不到this
-    this.reject = this.reject.bind(this);// 为什么这个地方拿不到this 是因为在initFunc中执行的原因?
-    this.then = this.then.bind(this);// 为什么这个地方拿不到this 是因为在initFunc中执行的原因?
-    this.catch = this.catch.bind(this);// 为什么这个地方拿不到this 是因为在initFunc中执行的原因?
-    initFunc(this.resolve, this.reject);
+    this.funcCacheList = [];
+    this.resolve = this.resolve.bind(this);
+    this.reject = this.reject.bind(this);
+    this.then = this.then.bind(this);
+    this.catch = this.catch.bind(this);
+
+    try {
+      initFunc(this.resolve, this.reject);
+    } catch(e) {
+      this.reject(e)
+    }
+
   }
 
   /**
@@ -22,16 +28,30 @@ class FakePromise {
   resolve(value) {
     if (this.status !== 'pendding') return;
     this.status = "fufilled";
-    this.value = value;  // 这里的value可能是Promise,也可能是值,先按照值来处理
-    console.log('执行resolve方法', value);
-    this.noticeChange();
+
+    const isPromiseObject = value && value.then;
+    if (!isPromiseObject) {
+      this.value = value;
+      this.noticeChange();
+    } else {
+      // 如果是类promise对象
+      try {
+        value.then(function (v) {
+          this.value = v;
+          this.noticeChange();
+        }.bind(this))
+      } catch(e) {
+        this.reject(e)
+      }
+
+    }
+
   }
 
   reject(value) {
     if (this.status !== 'pendding') return;
     this.status = "rejected";
-    this.value = value;  // 这里的value可能是异常,所以先按照值来处理
-    console.log('执行reject方法', value);
+    this.value = value;
     this.noticeChange();
   }
 
@@ -40,39 +60,36 @@ class FakePromise {
    */
   noticeChange() {
     if (this.status === 'pending') return;
-    setTimeout(function () {
-      while(this.funcCacheList.length) {
-        const needProcessed = this.funcCacheList.splice(0, 1)[0];
+    while(this.funcCacheList.length) {
+      const needProcessed = this.funcCacheList.splice(0, 1)[0];
 
-        const { onResolve, onRej, resolve, reject } = needProcessed;
-        if (this.status === 'fufilled') {
-          try {
-            if (typeof onResolve === 'function') {
-              const value = onResolve(this.value);
-              resolve(value);
-              return;
-            }
-            resolve(this.value);
-          } catch(e) {
-            reject(e);
+      const { onResolve, onRej, resolve, reject } = needProcessed;
+      if (this.status === 'fufilled') {
+        try {
+          if (typeof onResolve === 'function') {
+            const value = onResolve(this.value);
+            resolve(value);
+            return;
           }
-        }
-
-        if (this.status === 'rejected') {
-          try {
-            if (typeof onRej === 'function') {
-              const value = onRej(this.value);
-              reject(value);
-              return;
-            }
-            reject(this.value);
-          } catch(e) {
-            reject(e);
-          }
+          resolve(this.value);
+        } catch(e) {
+          reject(e);
         }
       }
-    }.bind(this), 1);
 
+      if (this.status === 'rejected') {
+        try {
+          if (typeof onRej === 'function') {
+            const value = onRej(this.value);
+            reject(value);
+            return;
+          }
+          reject(this.value);
+        } catch(e) {
+          reject(e);
+        }
+      }
+    }
   }
 
 
@@ -96,10 +113,14 @@ class FakePromise {
   }
 }
 
+const myPromise = new FakePromise((res) => {
+  throw new Error();
+  // res(23)
+})
 const mPromise = new FakePromise((res, rej) => {
-  res(10);
-}).then(() => {
-  console.log('执行我自己的then方法')
+  res(myPromise);
+}).then((v) => {
+  console.log('执行我自己的then方法', v, myPromise)
 }).catch(() => {
   console.log('执行catch方法')
 });
