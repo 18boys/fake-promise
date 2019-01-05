@@ -14,75 +14,84 @@ class FakePromise {
     initFunc(this.resolve, this.reject);
   }
 
+  /**
+   * 修改自身promise的状态为
+   * @param value
+   */
+
   resolve(value) {
     if (this.status !== 'pendding') return;
     this.status = "fufilled";
-    this.value = value;  // 这里的value可能是异常,所以先按照值来处理
-    console.log(value);
-
-    // 必须手动才能执行then catch方法
-    if (this.funcCacheList.length === 0) {
-      // return new FakePromise(function (res, rej) {
-      //   res();
-      // });
-      // 上面会导致死循环
-      // return new this.constructor(function (res, rej) {
-      //   res();
-      // });
-      // 上面会导致死循环
-      return;
-    }
-
-    const needProcessFuncObj = this.funcCacheList.splice(0, 1);
-    if (needProcessFuncObj.resolve) {
-      if (typeof needProcessFuncObj.resolve === 'function') needProcessFuncObj.resolve(); // 这个地方有问题 违反了智能改变一次状态的问题
-    }
+    this.value = value;  // 这里的value可能是Promise,也可能是值,先按照值来处理
+    console.log('执行resolve方法', value);
+    this.noticeChange();
   }
 
   reject(value) {
     if (this.status !== 'pendding') return;
     this.status = "rejected";
     this.value = value;  // 这里的value可能是异常,所以先按照值来处理
-    console.log(value);
-
-    // 必须手动才能执行then catch方法
-    if (this.funcCacheList.length === 0) {
-      return new FakePromise(function (res, rej) {
-        res();
-      });
-    }
-
-    const needProcessFuncObj = this.funcCacheList.splice(0, 1);
-    if (needProcessFuncObj.rej) {
-      if (typeof needProcessFuncObj.rej === 'function') needProcessFuncObj.rej(); // 这个地方有问题 违反了智能改变一次状态的问题
-    }
+    console.log('执行reject方法', value);
+    this.noticeChange();
   }
 
-  then(resolve, rej) {
-    // 只能先将resolve rej给缓存下来
-    this.funcCacheList.push({
-      resolve,
-      rej,
-    });
-    return this;  // 这里返回this 有问题,但是如果返回一个新的promise的话(为了给一个value status为初始状态的promise) 怎么接受到所有的then catch方法呢?
+  /**
+   * 执行回调函数
+   */
+  noticeChange() {
+    if (this.status === 'pending') return;
+    setTimeout(function () {
+      while(this.funcCacheList.length) {
+        const needProcessed = this.funcCacheList.splice(0, 1)[0];
 
-    // let r = '';
-    // if (this.status === 'fufilled') {
-    //   r = resolve();
-    // }
-    //
-    // if (this.status === 'rejected') {
-    //   r = rej();
-    // }
-    // 根据 r的不同类型返回不同的值
-    // r是promise  就直接返回r
-    // r是值就包装成 resolve的promise
-    // 这里为了简单,首先按照value来处理
-    // return new FakePromise(initFunc);
+        const { onResolve, onRej, resolve, reject } = needProcessed;
+        if (this.status === 'fufilled') {
+          try {
+            if (typeof onResolve === 'function') {
+              const value = onResolve(this.value);
+              resolve(value);
+              return;
+            }
+            resolve(this.value);
+          } catch(e) {
+            reject(e);
+          }
+        }
+
+        if (this.status === 'rejected') {
+          try {
+            if (typeof onRej === 'function') {
+              const value = onRej(this.value);
+              reject(value);
+              return;
+            }
+            reject(this.value);
+          } catch(e) {
+            reject(e);
+          }
+        }
+      }
+    }.bind(this), 1);
+
+  }
+
+
+  then(onResolve, onRej) {
+    const that = this;
+    return new FakePromise(function (resolve, reject) {
+      // 只能先将resolve rej给缓存下来
+      that.funcCacheList.push({
+        onResolve,
+        onRej,
+        resolve,
+        reject,
+      });
+      that.noticeChange();
+    });
+
   }
 
   catch(rej) {
-    const nullFunc = function () {};
     return this.then(null, rej);
   }
 }
@@ -90,7 +99,7 @@ class FakePromise {
 const mPromise = new FakePromise((res, rej) => {
   res(10);
 }).then(() => {
-  console.log('执行then方法')
+  console.log('执行我自己的then方法')
 }).catch(() => {
   console.log('执行catch方法')
 });
