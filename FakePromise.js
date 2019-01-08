@@ -69,38 +69,43 @@ class FakePromise {
 
   /**
    * 执行回调函数
+   * 根据规范,必须异步调用回调
    */
   noticeChange() {
     if (this.status === 'pending') return;
-    while(this.funcCacheList.length) {
-      const needProcessed = this.funcCacheList.splice(0, 1)[0];
-      const { onResolve, onRej, resolve, reject } = needProcessed;
-      if (this.status === 'fufilled') {
-        try {
-          if (typeof onResolve === 'function') {
-            const value = onResolve(this.value);
-            resolve(value);
-            return;
+    const that = this;
+    setTimeout(() => {
+      while(that.funcCacheList.length) {
+        const needProcessed = that.funcCacheList.splice(0, 1)[0];
+        const { onResolve, onRej, resolve, reject } = needProcessed;
+        if (that.status === 'fufilled') {
+          try {
+            if (typeof onResolve === 'function') {
+              const value = onResolve(that.value);
+              resolve(value);
+              return;
+            }
+            resolve(that.value);
+          } catch(e) {
+            reject(e);
           }
-          resolve(this.value);
-        } catch(e) {
-          reject(e);
         }
-      }
 
-      if (this.status === 'rejected') {
-        try {
-          if (typeof onRej === 'function') {
-            const value = onRej(this.value);
-            resolve(value); // 特别注意
-            return;
+        if (this.status === 'rejected') {
+          try {
+            if (typeof onRej === 'function') {
+              const value = onRej(this.value);
+              resolve(value); // 特别注意
+              return;
+            }
+            reject(this.value);
+          } catch(e) {
+            reject(e);
           }
-          reject(this.value);
-        } catch(e) {
-          reject(e);
         }
       }
-    }
+    }, 0)
+
   }
 
 
@@ -124,11 +129,11 @@ class FakePromise {
 }
 
 const myPromise = new FakePromise((res) => {
-  // throw new Error();
-  res(23)
+  throw new Error();
+  // res(23)
 });
 const mPromise = new FakePromise((res, rej) => {
-  res(23);
+  res(myPromise);
 }).then((v) => {
   console.log('执行我自己的then方法', v)
 }).catch(() => {
