@@ -3,19 +3,31 @@
  * @author shuai.li
  */
 class FakePromise {
+  static resolve() {
+    return new FakePromise((res) => {
+      res();
+    })
+  }
+
+  static reject() {
+    return new FakePromise((res, rej) => {
+      rej();
+    })
+  }
+
   constructor(initFunc) {
     this.status = "pendding";
     this.value = '';
     this.funcCacheList = [];
-    this.resolve = this.resolve.bind(this);
-    this.reject = this.reject.bind(this);
+    this.mResolve = this.mResolve.bind(this);
+    this.mReject = this.mReject.bind(this);
     this.then = this.then.bind(this);
     this.catch = this.catch.bind(this);
 
     try {
-      initFunc(this.resolve, this.reject);
+      initFunc(this.mResolve, this.mReject);
     } catch(e) {
-      this.reject(e)
+      this.mReject(e)
     }
 
   }
@@ -25,33 +37,32 @@ class FakePromise {
    * @param value
    */
 
-  resolve(value) {
+  mResolve(value) {
     if (this.status !== 'pendding') return;
     const isPromiseObject = value && value.then;
     if (!isPromiseObject) {
+      this.status = 'fufilled';
       this.value = value;
       this.noticeChange();
-    } else {
-      // 如果是类promise对象
-      try {
-        value.then(function (v) {
-          this.status = "fufilled";
-          this.value = v;
-          this.noticeChange();
-        }.bind(this),function(reason){
-          this.reject(reason)
-        }.bind(this))
-      } catch(e) {
-        this.reject(e)
-      }
-
+      return;
     }
-
+    // 如果是类promise对象
+    try {
+      value.then((v) => {
+        this.status = 'fufilled';
+        this.value = v;
+        this.noticeChange();
+      }, (reason) => {
+        this.mReject(reason)
+      })
+    } catch(e) {
+      this.mReject(e)
+    }
   }
 
-  reject(value) {
+  mReject(value) {
     if (this.status !== 'pendding') return;
-    this.status = "rejected";
+    this.status = 'rejected';
     this.value = value;
     this.noticeChange();
   }
@@ -81,7 +92,7 @@ class FakePromise {
         try {
           if (typeof onRej === 'function') {
             const value = onRej(this.value);
-            reject(value);
+            resolve(value); // 特别注意
             return;
           }
           reject(this.value);
@@ -105,7 +116,6 @@ class FakePromise {
       });
       that.noticeChange();
     });
-
   }
 
   catch(rej) {
@@ -114,15 +124,31 @@ class FakePromise {
 }
 
 const myPromise = new FakePromise((res) => {
-  throw new Error();
-  // res(23)
-})
+  // throw new Error();
+  res(23)
+});
 const mPromise = new FakePromise((res, rej) => {
-  res(myPromise);
+  res(23);
 }).then((v) => {
   console.log('执行我自己的then方法', v)
-},()=>{
-  console.log('执行catch方法1')
 }).catch(() => {
   console.log('执行catch方法')
 });
+
+FakePromise.resolve()
+  .then(() => {
+    console.log('进入FakePromise.resolve的resolve')
+  })
+  .catch(() => {
+    console.log('进入FakePromise.resolve的catch')
+  });
+
+
+FakePromise.reject()
+  .then(() => {
+    console.log('进入FakePromise.reject的resolve')
+  })
+  .catch(() => {
+    console.log('进入FakePromise.reject的catch')
+  });
+

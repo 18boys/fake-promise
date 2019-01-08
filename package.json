@@ -1,0 +1,20 @@
+{
+  "name": "fake-promise",
+  "version": "1.0.0",
+  "description": "",
+  "main": "FakePromise.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node $NODE_DEBUG_OPTION ./FakePromise.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/18boys/fake-promise.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/18boys/fake-promise/issues"
+  },
+  "homepage": "https://github.com/18boys/fake-promise#readme"
+}
